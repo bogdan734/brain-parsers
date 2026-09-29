@@ -167,6 +167,9 @@ def main():
         except PlaywrightTimeout:
             print(f'Page did not load in time: {page.url}')
             raise SystemExit(1)
+        except Error as error:
+            print(f'Browser error (window closed?): {error.message}')
+            raise SystemExit(1)
         finally:
             context.close()
 

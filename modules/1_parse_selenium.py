@@ -8,7 +8,7 @@ from pprint import pprint
 from time import sleep
 
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException, TimeoutException
+from selenium.common.exceptions import NoSuchElementException, NoSuchWindowException, TimeoutException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.support.ui import WebDriverWait
@@ -198,6 +198,9 @@ def main():
         product = get_product_data(driver)
     except TimeoutException:
         print(f'Page did not load in time: {driver.current_url}')
+        raise SystemExit(1)
+    except NoSuchWindowException:
+        print('Browser window was closed before parsing finished')
         raise SystemExit(1)
     finally:
         driver.quit()
