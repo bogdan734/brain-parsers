@@ -19,7 +19,10 @@ SEARCH_QUERY = 'Apple iPhone 15 128GB Black'
 # Kept outside Desktop/Documents - macOS blocks Chrome from those folders without a permission prompt
 PROFILE_DIR = os.environ.get('CHROME_PROFILE_DIR', os.path.expanduser('~/.cache/brain-parsers/chrome_profile'))
 SECURITY_CHECK_TIMEOUT = int(os.environ.get('SECURITY_CHECK_TIMEOUT', 180))  # seconds
+# Optional: attach to an already running Chrome started with --remote-debugging-port (e.g. 127.0.0.1:9222)
+DEBUGGER_ADDRESS = os.environ.get('CHROME_DEBUGGER_ADDRESS')
 SEARCH_BUTTON_XPATH = "//input[contains(@class, 'search-button-first-form')]"
+POPUP_SEARCH_BUTTON_XPATH = "//input[@class='qsr-submit']"
 
 
 def to_int(text):
@@ -57,9 +60,14 @@ def search_product(page, query):
     search_input = page.locator(f'xpath={SEARCH_BUTTON_XPATH}/preceding-sibling::input[@type="search"]')
     search_input.wait_for(state='visible')
     search_input.fill(query)
-    page.wait_for_timeout(1000)
+    page.wait_for_timeout(2000)
 
-    page.locator(f'xpath={SEARCH_BUTTON_XPATH}').click()
+    # Typing may open the quick search popup - its own "Знайти" button then covers the header one
+    popup_button = page.locator(f'xpath={POPUP_SEARCH_BUTTON_XPATH}')
+    if popup_button.count() and popup_button.first.is_visible():
+        popup_button.first.click()
+    else:
+        page.locator(f'xpath={SEARCH_BUTTON_XPATH}').click()
 
     # Wait for the search results page
     page.wait_for_url('**/search/**')
@@ -71,8 +79,8 @@ def search_product(page, query):
     first_result.scroll_into_view_if_needed()
     first_result.click()
 
-    # Wait for the product page
-    page.locator("xpath=//h1[contains(@class, 'main-title')]").wait_for()
+    # Wait for the product page (title may be hidden in narrow layouts, so wait for presence)
+    page.locator("xpath=//h1[contains(@class, 'main-title')]").wait_for(state='attached')
     page.wait_for_load_state('domcontentloaded')
     page.wait_for_timeout(2000)
 
@@ -143,21 +151,26 @@ def get_product_data(page):
 
 def main():
     with sync_playwright() as p:
-        # One browser (persistent context) for the whole run
+        # One browser for the whole run: either attach to a running Chrome or launch our own
+        browser = None
         try:
-            context = p.chromium.launch_persistent_context(
-                PROFILE_DIR,
-                channel='chrome',
-                headless=False,
-                viewport={'width': 1400, 'height': 900},
-                locale='uk-UA',
-                timezone_id='Europe/Kyiv',
-            )
+            if DEBUGGER_ADDRESS:
+                browser = p.chromium.connect_over_cdp(f'http://{DEBUGGER_ADDRESS}')
+                context = browser.contexts[0]
+            else:
+                context = p.chromium.launch_persistent_context(
+                    PROFILE_DIR,
+                    channel='chrome',
+                    headless=False,
+                    viewport={'width': 1400, 'height': 900},
+                    locale='uk-UA',
+                    timezone_id='Europe/Kyiv',
+                )
         except Error as error:
             print(f'Unable to launch browser - {error}')
             raise SystemExit(1)
 
-        page = context.pages[0] if context.pages else context.new_page()
+        page = context.new_page()
         page.set_default_timeout(15_000)
 
         try:
@@ -171,7 +184,12 @@ def main():
             print(f'Browser error (window closed?): {error.message}')
             raise SystemExit(1)
         finally:
-            context.close()
+            if browser:
+                # Attached Chrome stays open - close only our tab and disconnect
+                page.close()
+                browser.close()
+            else:
+                context.close()
 
     pprint(product, sort_dicts=False)
 

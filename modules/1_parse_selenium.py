@@ -24,7 +24,10 @@ SEARCH_QUERY = 'Apple iPhone 15 128GB Black'
 # Kept outside Desktop/Documents - macOS blocks Chrome from those folders without a permission prompt
 PROFILE_DIR = os.environ.get('CHROME_PROFILE_DIR', os.path.expanduser('~/.cache/brain-parsers/chrome_profile'))
 SECURITY_CHECK_TIMEOUT = int(os.environ.get('SECURITY_CHECK_TIMEOUT', 180))  # seconds
+# Optional: attach to an already running Chrome started with --remote-debugging-port (e.g. 127.0.0.1:9222)
+DEBUGGER_ADDRESS = os.environ.get('CHROME_DEBUGGER_ADDRESS')
 SEARCH_BUTTON_XPATH = "//input[contains(@class, 'search-button-first-form')]"
+POPUP_SEARCH_BUTTON_XPATH = "//input[@class='qsr-submit']"
 FIRST_RESULT_XPATH = "(//div[contains(@class, 'br-pp-img-grid')]/a)[1]"
 
 
@@ -46,8 +49,11 @@ def get_spec_value(specs_block, title):
 
 def get_driver():
     options = webdriver.ChromeOptions()
-    options.add_argument('--start-maximized')
-    options.add_argument(f'--user-data-dir={PROFILE_DIR}')
+    if DEBUGGER_ADDRESS:
+        options.debugger_address = DEBUGGER_ADDRESS
+    else:
+        options.add_argument('--start-maximized')
+        options.add_argument(f'--user-data-dir={PROFILE_DIR}')
     return webdriver.Chrome(options=options)
 
 
@@ -72,11 +78,14 @@ def search_product(driver, wait, query):
     ))
     search_input.clear()
     search_input.send_keys(query)
-    sleep(1)
+    sleep(2)
 
-    search_button = wait.until(EC.element_to_be_clickable(
-        (By.XPATH, SEARCH_BUTTON_XPATH)
-    ))
+    # Typing may open the quick search popup - its own "Знайти" button then covers the header one
+    popup_button = driver.find_elements(By.XPATH, POPUP_SEARCH_BUTTON_XPATH)
+    if popup_button and popup_button[0].is_displayed():
+        search_button = popup_button[0]
+    else:
+        search_button = wait.until(EC.element_to_be_clickable((By.XPATH, SEARCH_BUTTON_XPATH)))
     search_button.click()
 
     # Wait for the search results page
