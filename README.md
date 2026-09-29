@@ -69,7 +69,8 @@ brain-parsers/
 │   ├── products.csv               # CSV export
 │   └── brain_dump.sql             # PostgreSQL dump
 ├── docs/
-│   └── DJANGO_SETUP.md            # step-by-step Django + Postgres setup
+│   ├── DJANGO_SETUP.md            # step-by-step Django + Postgres setup
+│   └── DJANGO_SETUP.docx          # same guide as a Word document
 ├── docker-compose.yml             # PostgreSQL 16
 └── requirements.txt
 ```
@@ -248,4 +249,4 @@ Short, class-based XPaths — no copied absolute paths.
 
 Step-by-step, command-by-command guide for spinning up an empty Django + Postgres
 project with `parser_app`, `modules/` and `load_django.py` in 5–10 minutes:
-**[docs/DJANGO_SETUP.md](docs/DJANGO_SETUP.md)**
+**[docs/DJANGO_SETUP.md](docs/DJANGO_SETUP.md)** (Word version: [docs/DJANGO_SETUP.docx](docs/DJANGO_SETUP.docx))
