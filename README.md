@@ -126,6 +126,8 @@ CHROME_DEBUGGER_ADDRESS=127.0.0.1:9222 ./scripts/run_all.sh
 
 | Variable | Default |
 |---|---|
+| `DJANGO_SECRET_KEY` | local dev key |
+| `DJANGO_DEBUG` | `1` |
 | `POSTGRES_DB` | `brain` |
 | `POSTGRES_USER` | `brain` |
 | `POSTGRES_PASSWORD` | `brain` |
