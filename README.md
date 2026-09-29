@@ -68,6 +68,8 @@ brain-parsers/
 ├── results/
 │   ├── products.csv               # CSV export
 │   └── brain_dump.sql             # PostgreSQL dump
+├── scripts/
+│   └── run_all.sh                 # whole pipeline in one command
 ├── docs/
 │   ├── DJANGO_SETUP.md            # step-by-step Django + Postgres setup
 │   └── DJANGO_SETUP.docx          # same guide as a Word document
@@ -103,6 +105,12 @@ python 2_export_csv.py
 docker exec brain-parsers-db pg_dump -U brain --no-owner brain > ../results/brain_dump.sql
 ```
 
+Or everything at once — DB, migrations, all three parsers, CSV export and DB dump:
+
+```bash
+./scripts/run_all.sh
+```
+
 <details>
 <summary><b>Environment variables</b> (all optional, defaults match docker-compose)</summary>
 
@@ -113,15 +121,16 @@ docker exec brain-parsers-db pg_dump -U brain --no-owner brain > ../results/brai
 | `POSTGRES_PASSWORD` | `brain` |
 | `POSTGRES_HOST` | `localhost` |
 | `POSTGRES_PORT` | `5432` |
-| `CHROME_PROFILE_DIR` | `~/.cache/brain-parsers/chrome_profile` |
-| `PLAYWRIGHT_PROFILE_DIR` | `~/.cache/brain-parsers/playwright_profile` |
+| `CHROME_PROFILE_DIR` | `~/.cache/brain-parsers/chrome_profile` (shared by Selenium and Playwright) |
+| `SECURITY_CHECK_TIMEOUT` | `180` — seconds a browser parser waits for a manual security check |
 
 </details>
 
 > **Browser parsers & the security check.** brain.com.ua sits behind Cloudflare and sometimes shows
-> a *"confirm you are human"* page to automated browsers. Both browser parsers use a persistent
-> Chrome profile: if the check appears, the script pauses (up to 3 min) — pass it once by hand in the
-> opened window, cookies are saved in the profile and the next runs go straight through.
+> a *"confirm you are human"* page to automated browsers. Both browser parsers share one persistent
+> Chrome profile: if the check appears, the script pauses (`SECURITY_CHECK_TIMEOUT`, 3 min by default) —
+> pass it once by hand in the opened window, cookies are saved in the profile and the next runs
+> (of both parsers) go straight through.
 > The profile lives outside `Desktop`/`Documents` because macOS blocks Chrome from those folders
 > without a permission prompt.
 
