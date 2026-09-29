@@ -127,3 +127,4 @@ if response.status_code == 200:
 
 else:
     print(f'Error: {response.status_code}')
+    raise SystemExit(1)

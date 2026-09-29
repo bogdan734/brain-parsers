@@ -20,9 +20,11 @@ BASE_URL = 'https://brain.com.ua/ukr/'
 SEARCH_QUERY = 'Apple iPhone 15 128GB Black'
 
 # Chrome profile keeps cookies between runs, so the site's security check
-# (if it shows up) has to be passed by hand only once
-# (kept outside Desktop/Documents - macOS blocks Chrome from those folders without a permission prompt)
+# (if it shows up) has to be passed by hand only once. The Playwright parser uses the same profile.
+# Kept outside Desktop/Documents - macOS blocks Chrome from those folders without a permission prompt
 PROFILE_DIR = os.environ.get('CHROME_PROFILE_DIR', os.path.expanduser('~/.cache/brain-parsers/chrome_profile'))
+SECURITY_CHECK_TIMEOUT = int(os.environ.get('SECURITY_CHECK_TIMEOUT', 180))  # seconds
+SEARCH_BUTTON_XPATH = "//input[contains(@class, 'search-button-first-form')]"
 FIRST_RESULT_XPATH = "(//div[contains(@class, 'br-pp-img-grid')]/a)[1]"
 
 
@@ -51,10 +53,11 @@ def get_driver():
 
 def wait_for_security_check(driver):
     # Cloudflare page has no site header - if it is shown, wait until a human passes it
-    if not driver.find_elements(By.XPATH, "//input[contains(@class, 'search-button-first-form')]"):
-        print('Security check is shown - pass it manually in the opened browser window (waiting up to 3 min)')
-        WebDriverWait(driver, 180).until(EC.presence_of_element_located(
-            (By.XPATH, "//input[contains(@class, 'search-button-first-form')]")
+    if not driver.find_elements(By.XPATH, SEARCH_BUTTON_XPATH):
+        print(f'Security check is shown - pass it manually in the opened browser window '
+              f'(waiting up to {SECURITY_CHECK_TIMEOUT // 60} min)')
+        WebDriverWait(driver, SECURITY_CHECK_TIMEOUT).until(EC.presence_of_element_located(
+            (By.XPATH, SEARCH_BUTTON_XPATH)
         ))
         sleep(2)
 
@@ -65,14 +68,14 @@ def search_product(driver, wait, query):
     wait_for_security_check(driver)
 
     search_input = wait.until(EC.visibility_of_element_located(
-        (By.XPATH, "//input[contains(@class, 'search-button-first-form')]/preceding-sibling::input[@type='search']")
+        (By.XPATH, f"{SEARCH_BUTTON_XPATH}/preceding-sibling::input[@type='search']")
     ))
     search_input.clear()
     search_input.send_keys(query)
     sleep(1)
 
     search_button = wait.until(EC.element_to_be_clickable(
-        (By.XPATH, "//input[contains(@class, 'search-button-first-form')]")
+        (By.XPATH, SEARCH_BUTTON_XPATH)
     ))
     search_button.click()
 
@@ -193,12 +196,11 @@ def main():
         search_product(driver, wait, SEARCH_QUERY)
         open_all_specs(driver)
         product = get_product_data(driver)
-    except TimeoutException as error:
-        print(f'Page did not load in time: {error}')
+    except TimeoutException:
+        print(f'Page did not load in time: {driver.current_url}')
+        raise SystemExit(1)
+    finally:
         driver.quit()
-        return
-
-    driver.quit()
 
     pprint(product, sort_dicts=False)
 

@@ -15,8 +15,10 @@ BASE_URL = 'https://brain.com.ua/ukr/'
 SEARCH_QUERY = 'Apple iPhone 15 128GB Black'
 
 # Persistent profile keeps cookies between runs, so the site's security check
-# (if it shows up) has to be passed by hand only once
-PROFILE_DIR = os.environ.get('PLAYWRIGHT_PROFILE_DIR', os.path.expanduser('~/.cache/brain-parsers/playwright_profile'))
+# (if it shows up) has to be passed by hand only once. Same profile as the Selenium parser.
+# Kept outside Desktop/Documents - macOS blocks Chrome from those folders without a permission prompt
+PROFILE_DIR = os.environ.get('CHROME_PROFILE_DIR', os.path.expanduser('~/.cache/brain-parsers/chrome_profile'))
+SECURITY_CHECK_TIMEOUT = int(os.environ.get('SECURITY_CHECK_TIMEOUT', 180))  # seconds
 SEARCH_BUTTON_XPATH = "//input[contains(@class, 'search-button-first-form')]"
 
 
@@ -41,8 +43,9 @@ def get_spec_value(specs_block, title):
 def wait_for_security_check(page):
     # Cloudflare page has no site header - if it is shown, wait until a human passes it
     if page.locator(f'xpath={SEARCH_BUTTON_XPATH}').count() == 0:
-        print('Security check is shown - pass it manually in the opened browser window (waiting up to 3 min)')
-        page.locator(f'xpath={SEARCH_BUTTON_XPATH}').first.wait_for(state='attached', timeout=180_000)
+        print(f'Security check is shown - pass it manually in the opened browser window '
+              f'(waiting up to {SECURITY_CHECK_TIMEOUT // 60} min)')
+        page.locator(f'xpath={SEARCH_BUTTON_XPATH}').first.wait_for(state='attached', timeout=SECURITY_CHECK_TIMEOUT * 1000)
         page.wait_for_timeout(2000)
 
 
@@ -152,7 +155,7 @@ def main():
             )
         except Error as error:
             print(f'Unable to launch browser - {error}')
-            return
+            raise SystemExit(1)
 
         page = context.pages[0] if context.pages else context.new_page()
         page.set_default_timeout(15_000)
@@ -161,12 +164,11 @@ def main():
             search_product(page, SEARCH_QUERY)
             open_all_specs(page)
             product = get_product_data(page)
-        except PlaywrightTimeout as error:
-            print(f'Page did not load in time: {error}')
+        except PlaywrightTimeout:
+            print(f'Page did not load in time: {page.url}')
+            raise SystemExit(1)
+        finally:
             context.close()
-            return
-
-        context.close()
 
     pprint(product, sort_dicts=False)
 
